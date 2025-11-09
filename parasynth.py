@@ -9,7 +9,7 @@ import google.generativeai as genai  # <-- Import Google
 from mimetypes import guess_type
 
 # Assuming 'combine_analysis_to_json' is in a file named 'w.py'
-from w import combine_analysis_to_json 
+from assembler import combine_analysis_to_json 
 
 # ---- Configuration ----
 load_dotenv()
@@ -17,9 +17,9 @@ logger = logging.getLogger("wheel-sync")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 # --- Use a text-only Gemini model ---
-MODEL = "gemini-2.5-flash"
-DB_PATH = r'..\Documents\Elevatoin_Points_Section_B_8300322035806414704.xlsx'
-IMAGE_PATH = r'C:\Users\gurpr\Pictures\Screenshots\Screenshot 2025-11-08 130917.png'
+MODEL = os.getenv("MODEL")
+DB_PATH = os.getenv("DB_PATH")
+IMAGE_PATH = os.getenv("IMAGE_PATH")
 
 # --- Use Google API Key ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -90,27 +90,22 @@ def extract_text_from_response(resp) -> str:
 
 # aa.py (FIXED validate_and_parse_json function)
 
+# aa.py (FIXED validate_and_parse_json to accept strings with units)
+
 def validate_and_parse_json(text: str) -> dict:
     """
     Ensure the model returned a single JSON object. Raises ValueError on parse issues.
+    This version expects design values to be strings (e.g., "30 mm").
     """
-    # Trim whitespace
+    # Trim whitespace and extract the JSON block (this part is now correct)
     txt = text.strip()
-
-    # --- FIX: New, more aggressive code fence and stray text removal ---
-    # Try to find the start of the actual JSON object '{'
     first = txt.find("{")
-    # Try to find the end of the actual JSON object '}'
     last = txt.rfind("}")
 
     if first == -1 or last == -1 or last <= first:
-        # If we can't find a JSON block, raise an error
         raise ValueError("Model output does not contain a valid JSON object.")
         
-    # Slice the text to get ONLY the content from the first '{' to the last '}'
     txt = txt[first:last+1]
-    
-    # --- END FIX ---
     
     parsed = json.loads(txt)
     if not isinstance(parsed, dict):
@@ -122,12 +117,15 @@ def validate_and_parse_json(text: str) -> dict:
     if missing:
         raise ValueError(f"JSON missing required keys: {missing}")
     
-    # --- Constraint check remains the same ---
-    spacing = parsed.get("Tread_Spacing")
-    if spacing is not None and not isinstance(spacing, (int, float)):
-         raise ValueError("Tread_Spacing must be a number.")
-    if spacing is not None and 360 % spacing != 0:
-         pass 
+    # --- CRITICAL CHANGE: We now check if the values are strings, not numbers. ---
+    design_keys = ["Tread_Spacing", "Tire_Thickness", "Tire_OD", "Tread_Thickness"]
+    for key in design_keys:
+        value = parsed.get(key)
+        if not isinstance(value, str) or not value.strip():
+             raise ValueError(f"Design key '{key}' must be a non-empty string with units.")
+             
+    # NOTE: The explicit check for 360 divisibility is removed since the value is a string.
+    # We must trust the AI to perform that calculation based on the prompt instructions.
          
     return parsed
 

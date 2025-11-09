@@ -4,7 +4,7 @@
 
 # --- Imports ---
 from get_topography import analyze_and_export_metrics 
-from f import get_terrain_classification
+from terrain_identifier import get_terrain_classification
 from typing import Dict, Any, List, Optional
 import json # Used for displaying the final structure
 
